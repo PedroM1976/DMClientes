@@ -1,9 +1,39 @@
 {
   "files": [
     {
+      "name": "BASE DE DADOS - CLUBE DE NEGÓCIOS - CAE 95310.xls",
+      "path": "dados/importados/BASE DE DADOS - CLUBE DE NEGÓCIOS - CAE 95310.xls",
+      "label": "BASE DE DADOS - CLUBE DE NEGÓCIOS - CAE 95310"
+    },
+    {
+      "name": "CAE 49410 - TRANSPORTADORAS.xlsx",
+      "path": "dados/importados/CAE 49410 - TRANSPORTADORAS.xlsx",
+      "label": "CAE 49410 - TRANSPORTADORAS"
+    },
+    {
+      "name": "conces.xlsx",
+      "path": "dados/importados/conces.xlsx",
+      "label": "conces"
+    },
+    {
+      "name": "Driver Iberica.xlsx",
+      "path": "dados/importados/Driver Iberica.xlsx",
+      "label": "Driver Iberica"
+    },
+    {
       "name": "Firststop Portugal 2026 Synergee Code.xlsx",
       "path": "dados/importados/Firststop Portugal 2026 Synergee Code.xlsx",
       "label": "Firststop Portugal 2026 Synergee Code"
+    },
+    {
+      "name": "listagem clientes gn.xlsx",
+      "path": "dados/importados/listagem clientes gn.xlsx",
+      "label": "listagem clientes gn"
+    },
+    {
+      "name": "RELAÇÃO DOS COOPERADORES E PARCEIROS.xls",
+      "path": "dados/importados/RELAÇÃO DOS COOPERADORES E PARCEIROS.xls",
+      "label": "RELAÇÃO DOS COOPERADORES E PARCEIROS"
     }
   ]
 }
