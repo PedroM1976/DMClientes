@@ -89,11 +89,22 @@ async function loadClients(){
 }
 function parseSales(rows){const codes=new Set,nifs=new Set;rows.forEach(r=>{const c=clean(value(r,["CLIENTES","Cliente","Código Cliente"])),m=c.match(/^\s*0*(\d+)/);if(m)codes.add(String(Number(m[1])));const n=nif(value(r,["CONTRIBUINTE","NIF","VAT Number"]));if(n)nifs.add(n)});return{codes,nifs}}
 function parseImported(rows,setId,label){
- return rows.map((r,i)=>({uid:setId+"_"+i,name:clean(value(r,["COMPANY POS","COMPANY","NOMBRE COMERCIAL (Nome Comercial)","Nome","Cliente"])),legalName:clean(value(r,["COMPANY"])),
- commercialName:clean(value(r,["NOMBRE COMERCIAL (Nome Comercial)"])),code:clean(value(r,["B2B CODE","Código","Cliente"])),nif:nif(value(r,["VAT Number","Contribuinte","NIF"])),
- email:clean(value(r,["CORREO GENERAL (E-mail Geral)","Email","E-Mail"])),phone:clean(value(r,["Telefone","Phone"])),address:clean(value(r,["Morada"])),
- locality:clean(value(r,["LOCALIDAD (Localidade)","Localidade"])),postalCode:clean(value(r,["CP (Codigo Postal)","Código Postal"])),district:district(value(r,["PROVINCIA (Distrito)","Distrito"])),
- source:label,isImported:true,setId})).filter(x=>x.name||x.nif||x.email)
+ return rows.map((r,i)=>({
+  uid:setId+"_"+i,
+  name:clean(value(r,["COMPANY POS","COMPANY","NOMBRE COMERCIAL (Nome Comercial)","NOME DA FIRMA","Nome","Cliente"])),
+  legalName:clean(value(r,["COMPANY","NOME DA FIRMA"])),
+  commercialName:clean(value(r,["NOMBRE COMERCIAL (Nome Comercial)","NOME DA FIRMA"])),
+  code:clean(value(r,["B2B CODE","Código","Cliente","COOP.","Cliente Sage"])),
+  nif:nif(value(r,["VAT Number","Contribuinte","NIF","NºCONT.","Nº CONT.","N CONT"])),
+  email:clean(value(r,["CORREO GENERAL (E-mail Geral)","Email","E-Mail","E-MAIL"])),
+  phone:clean(value(r,["Telefone","Phone","TELEFONE"])),
+  address:clean(value(r,["Morada","MORADA"])),
+  locality:clean(value(r,["LOCALIDAD (Localidade)","Localidade","LOCALIDADE"])),
+  postalCode:clean(value(r,["CP (Codigo Postal)","Código Postal","CP"])),
+  district:district(value(r,["PROVINCIA (Distrito)","Distrito"])),
+  seller:clean(value(r,["REPRESENTANTE","Vendedor"])),
+  source:label,isImported:true,setId
+ })).filter(x=>x.name||x.nif||x.email||x.code)
 }
 function reconcile(sales){
  const byNif=new Map,byEmail=new Map,byName=new Map;
