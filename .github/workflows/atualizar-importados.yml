@@ -1,0 +1,39 @@
+name: Atualizar lista de ficheiros importados
+
+on:
+  push:
+    paths:
+      - "dados/importados/**"
+      - "gerar_manifesto.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar-manifesto:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Gerar manifesto
+        run: python gerar_manifesto.py
+
+      - name: Guardar manifesto
+        run: |
+          if git diff --quiet dados/importados/manifest.json; then
+            echo "Sem alterações."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dados/importados/manifest.json
+          git commit -m "Atualizar manifesto de ficheiros importados"
+          git push
