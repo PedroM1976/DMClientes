@@ -1,16 +1,6 @@
 {
   "files": [
     {
-      "name": "BASE DE DADOS - CLUBE DE NEGÓCIOS - CAE 95310.xls",
-      "path": "dados/importados/BASE DE DADOS - CLUBE DE NEGÓCIOS - CAE 95310.xls",
-      "label": "BASE DE DADOS - CLUBE DE NEGÓCIOS - CAE 95310"
-    },
-    {
-      "name": "CAE 49410 - TRANSPORTADORAS.xlsx",
-      "path": "dados/importados/CAE 49410 - TRANSPORTADORAS.xlsx",
-      "label": "CAE 49410 - TRANSPORTADORAS"
-    },
-    {
       "name": "Driver Iberica.xlsx",
       "path": "dados/importados/Driver Iberica.xlsx",
       "label": "Driver Iberica"
