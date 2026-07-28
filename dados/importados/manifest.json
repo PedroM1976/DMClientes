@@ -11,11 +11,6 @@
       "label": "CAE 49410 - TRANSPORTADORAS"
     },
     {
-      "name": "conces.xlsx",
-      "path": "dados/importados/conces.xlsx",
-      "label": "conces"
-    },
-    {
       "name": "Driver Iberica.xlsx",
       "path": "dados/importados/Driver Iberica.xlsx",
       "label": "Driver Iberica"
@@ -24,11 +19,6 @@
       "name": "Firststop Portugal 2026 Synergee Code.xlsx",
       "path": "dados/importados/Firststop Portugal 2026 Synergee Code.xlsx",
       "label": "Firststop Portugal 2026 Synergee Code"
-    },
-    {
-      "name": "listagem clientes gn.xlsx",
-      "path": "dados/importados/listagem clientes gn.xlsx",
-      "label": "listagem clientes gn"
     },
     {
       "name": "RELAÇÃO DOS COOPERADORES E PARCEIROS.xls",
