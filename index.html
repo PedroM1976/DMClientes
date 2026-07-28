@@ -69,7 +69,7 @@ header h1{font-size:20px;margin:0}header small{opacity:.78}.wrap{max-width:1720p
 <script>
 const FILES={clientes:"dados/clientes.xlsx",vendas:"dados/vendas.xlsx",manifest:"dados/importados/manifest.json"};
 const positions={"VIANA DO CASTELO":[18,5],"BRAGA":[37,8],"VILA REAL":[60,12],"BRAGANCA":[80,9],"PORTO":[34,20],"AVEIRO":[31,33],"VISEU":[52,31],"GUARDA":[72,30],"COIMBRA":[40,43],"CASTELO BRANCO":[66,46],"LEIRIA":[33,54],"SANTAREM":[49,58],"LISBOA":[29,68],"PORTALEGRE":[69,62],"SETUBAL":[39,76],"EVORA":[62,75],"BEJA":[57,87],"FARO":[54,97],"ACORES":[8,88],"MADEIRA":[15,97],"SEM DISTRITO":[88,94]};
-let base=[], importedSets=[], current="base", selectedDistrict="", forceReload=false, searchTimer=null;
+let base=[], importedSets=[], current="base", selectedDistrict="", forceReload=false, searchTimer=null, uidIndex=new Map(), lastFiltered=[], renderLimit=400;
 const $=id=>document.getElementById(id),fmt=n=>new Intl.NumberFormat("pt-PT").format(n||0),clean=v=>String(v??"").trim();
 const esc=v=>clean(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const norm=v=>clean(v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]/g,"");
@@ -116,6 +116,13 @@ function reconcile(sales){
  base.forEach(c=>{c.inactive=c.group==="INA";c.hasSales=(c.nif&&sales.nifs.has(c.nif))||sales.codes.has(String(Number(c.code)||c.code));c.matchState=c.inactive?"inactive":c.hasSales?"sales":"nosales";if(c.nif&&!byNif.has(c.nif))byNif.set(c.nif,c);if(c.email&&!byEmail.has(norm(c.email)))byEmail.set(norm(c.email),c);if(c.name&&!byName.has(norm(c.name)))byName.set(norm(c.name),c)});
  importedSets.forEach(set=>set.rows.forEach(r=>{let m=null,s="";if(r.nif&&byNif.has(r.nif)){m=byNif.get(r.nif);s="existing"}else if(r.email&&byEmail.has(norm(r.email))){m=byEmail.get(norm(r.email));s="existing"}else if(r.name&&byName.has(norm(r.name))){m=byName.get(norm(r.name));s="existing"}else{const rn=norm(r.legalName||r.name);if(rn.length>7){m=base.find(c=>{const cn=norm(c.name);return cn.length>7&&(cn.includes(rn)||rn.includes(cn))})||null;if(m)s="possible"}}r.match=m;r.matchState=s||"new";r.hasSales=!!(m&&m.hasSales);r.inactive=!!(m&&m.inactive)}))
 }
+function makeSearchIndex(r){
+ return norm([r.name,r.legalName,r.commercialName,r.nif,r.code,r.email,r.phone,r.mobile,r.address,r.postalCode,r.locality,r.district,r.seller,r.group,r.source].join(" "))
+}
+function prepareIndexes(){
+ uidIndex=new Map();
+ [...base,...importedSets.flatMap(x=>x.rows)].forEach(r=>{r.searchIndex=makeSearchIndex(r);uidIndex.set(r.uid,r)})
+}
 function currentSet(){return current==="base"?{id:"base",label:"Listagem de clientes",rows:base}:importedSets.find(x=>x.id===current)}
 function statusHtml(r){if(!r.isImported){if(r.inactive)return'<span class="status inactive">Inativo</span>';return r.hasSales?'<span class="status sales">Com vendas</span>':'<span class="status nosales">Sem vendas</span>'}if(r.matchState==="new")return'<span class="status new">Cliente novo</span>';if(r.matchState==="possible")return'<span class="status possible">Possível correspondência</span>';return'<span class="status existing">Já é cliente</span>'+(r.inactive?'<span class="status inactive">Inativo</span>':r.hasSales?'<span class="status sales">Com vendas</span>':'<span class="status nosales">Sem vendas</span>')}
 function statusText(r){if(!r.isImported)return r.inactive?"Inativo":r.hasSales?"Com vendas":"Sem vendas";if(r.matchState==="new")return"Cliente novo";if(r.matchState==="possible")return"Possível correspondência";return"Já é cliente - "+(r.inactive?"Inativo":r.hasSales?"Com vendas":"Sem vendas")} 
@@ -126,7 +133,7 @@ function configureFilters(set){
 }
 function filtered(){
  const set=currentSet(),q=norm($("search").value),st=$("state").value,act=$("activity").value;
- return set.rows.filter(r=>{if(selectedDistrict&&r.district!==selectedDistrict)return false;if(set.id==="base"){if(act==="active"&&r.inactive)return false;if(act==="inactive"&&!r.inactive)return false}if(st&&r.matchState!==st)return false;if(q&&!norm([r.name,r.legalName,r.commercialName,r.nif,r.code,r.email,r.phone,r.locality,r.district].join(" ")).includes(q))return false;return true})
+ return set.rows.filter(r=>{if(selectedDistrict&&r.district!==selectedDistrict)return false;if(set.id==="base"){if(act==="active"&&r.inactive)return false;if(act==="inactive"&&!r.inactive)return false}if(st&&r.matchState!==st)return false;if(q&&!(r.searchIndex||"").includes(q))return false;return true})
 }
 function renderCards(set){
  let cards=[];
@@ -142,17 +149,24 @@ function renderMap(rows,set){
  $("legend").textContent=set.id==="base"?"Mapa exclusivo da listagem base.":"Mapa exclusivo deste ficheiro importado."
 }
 function fillDistricts(set){const vals=[...new Set(set.rows.map(r=>r.district).filter(Boolean))].sort();$("district").innerHTML='<option value="">Todos os distritos</option>'+vals.map(x=>`<option>${esc(x)}</option>`).join("");$("district").value=selectedDistrict}
+function renderRows(rows){
+ const shown=rows.slice(0,renderLimit);
+ let html=shown.map(r=>`<tr class="data" onclick="showDetail('${r.uid}')"><td><b>${esc(r.name||"Sem nome")}</b><br><small>${esc(r.code||"")}</small></td><td>${esc(r.nif)}</td><td>${esc(r.district)}</td><td>${statusHtml(r)}</td></tr>`).join("");
+ if(!html)html='<tr><td colspan="4" class="empty">Sem resultados</td></tr>';
+ else if(rows.length>shown.length)html+=`<tr><td colspan="4" class="empty"><button class="btn" onclick="showMore()">Mostrar mais (${fmt(rows.length-shown.length)})</button></td></tr>`;
+ $("tbody").innerHTML=html
+}
+function showMore(){renderLimit+=400;renderRows(lastFiltered)}
 function render(){
- const set=currentSet(),rows=filtered();renderCards(set);renderMap(rows,set);
- $("tbody").innerHTML=rows.slice(0,2500).map(r=>`<tr class="data" onclick="showDetail('${r.uid}')"><td><b>${esc(r.name||"Sem nome")}</b><br><small>${esc(r.code||"")}</small></td><td>${esc(r.nif)}</td><td>${esc(r.district)}</td><td>${statusHtml(r)}</td></tr>`).join("")||'<tr><td colspan="4" class="empty">Sem resultados</td></tr>';
+ const set=currentSet(),rows=filtered();lastFiltered=rows;renderCards(set);renderMap(rows,set);renderRows(rows);
  $("listTitle").textContent=`${set.label} — ${fmt(rows.length)} registo(s)`;
 }
 function renderTabs(){
  $("tabs").innerHTML=[{id:"base",label:"Base de clientes"},...importedSets].map(x=>`<button class="tab ${x.id===current?"active":""}" onclick="selectTab('${x.id}')">${esc(x.label)}</button>`).join("")
 }
-function selectTab(id){current=id;selectedDistrict="";$("search").value="";renderTabs();const set=currentSet();configureFilters(set);fillDistricts(set);render()}
+function selectTab(id){current=id;selectedDistrict="";renderLimit=400;$("search").value="";renderTabs();const set=currentSet();configureFilters(set);fillDistricts(set);render()}
 function showDetail(uid){
- const all=[...base,...importedSets.flatMap(x=>x.rows)],r=all.find(x=>x.uid===uid);if(!r)return;
+ const r=uidIndex.get(uid);if(!r)return;
  const match=r.match?`${r.match.name} (${r.match.code||r.match.nif})`:"";
  const fields=[["Código",r.code],["NIF",r.nif],["Nome legal",r.legalName],["Nome comercial",r.commercialName],["Email",r.email],["Telefone",r.phone],["Morada",r.address],["Código postal",r.postalCode],["Localidade",r.locality],["Distrito",r.district],["Vendedor",r.seller],["Grupo empresa",r.group],["Ficheiro de origem",r.source],["Correspondência na base",match]];
  $("detail").innerHTML=`<h2>${esc(r.name||"Sem nome")}</h2><p>${statusHtml(r)}</p>`+fields.filter(x=>clean(x[1])!=="").map(x=>`<div class="field"><label>${esc(x[0])}</label><div>${esc(x[1])}</div></div>`).join("");$("side").classList.add("open");$("overlay").classList.add("open")
@@ -175,11 +189,11 @@ async function loadAll(force=false){
    if(!manifestRes.ok)throw new Error("Não foi possível ler o manifesto dos importados");
    const manifest=await manifestRes.json();base=clients;
    importedSets=await Promise.all((manifest.files||[]).map(async(f,i)=>{const rows=await loadRows(f.path,force);return{id:"imp"+i,label:f.label||f.name,file:f.name,rows:parseImported(rows,"imp"+i,f.label||f.name)}}));
-   reconcile(parseSales(salesRows));renderTabs();const set=currentSet();configureFilters(set);fillDistricts(set);render();$("stamp").textContent="Atualizado: "+new Date().toLocaleString("pt-PT")
+   reconcile(parseSales(salesRows));prepareIndexes();renderLimit=400;renderTabs();const set=currentSet();configureFilters(set);fillDistricts(set);render();$("stamp").textContent="Atualizado: "+new Date().toLocaleString("pt-PT")
  }catch(e){console.error(e);$("notice").style.display="block";$("notice").innerHTML="<b>Erro ao carregar:</b> "+esc(e.message)+"<br>Confirme os nomes dos ficheiros e publique através do GitHub Pages.";$("stamp").textContent="Erro"}
  finally{forceReload=false;$("reload").disabled=false}
 }
-if(typeof LOGO_DM!=="undefined")$("dmLogo").src=LOGO_DM;["activity","state"].forEach(id=>$(id).addEventListener("change",render));$("search").addEventListener("input",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(render,160)});$("district").addEventListener("change",e=>{selectedDistrict=e.target.value;render()});$("exportExcel").onclick=exportExcel;$("exportPdf").onclick=exportPdf;$("reload").onclick=()=>loadAll(true);loadAll(false);
+if(typeof LOGO_DM!=="undefined")$("dmLogo").src=LOGO_DM;["activity","state"].forEach(id=>$(id).addEventListener("change",render));$("search").addEventListener("input",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{renderLimit=400;render()},180)});$("district").addEventListener("change",e=>{selectedDistrict=e.target.value;render()});$("exportExcel").onclick=exportExcel;$("exportPdf").onclick=exportPdf;$("reload").onclick=()=>loadAll(true);loadAll(false);
 </script>
 </body>
 </html>
