@@ -197,15 +197,43 @@ function exportPdf(){const rows=filtered();if(!rows.length)return alert("Não ex
 
 async function loadAll(force=false){
  forceReload=force;$("reload").disabled=true;$("stamp").textContent="A carregar ficheiros…";$("notice").style.display="none";
+ const errors=[];
  try{
-   const manifestUrl=force?FILES.manifest+"?v="+Date.now():FILES.manifest;
-   const [clients,salesRows,manifestRes]=await Promise.all([loadClients(),loadRows(FILES.vendas,force),fetch(manifestUrl,{cache:force?"no-store":"default"})]);
-   if(!manifestRes.ok)throw new Error("Não foi possível ler o manifesto dos importados");
-   const manifest=await manifestRes.json();base=clients;
-   importedSets=await Promise.all((manifest.files||[]).map(async(f,i)=>{const rows=await loadRows(f.path,force);return{id:"imp"+i,label:f.label||f.name,file:f.name,rows:parseImported(rows,"imp"+i,f.label||f.name)}}));
-   reconcile(parseSales(salesRows));prepareIndexes();renderLimit=400;renderTabs();const set=currentSet();configureFilters(set);fillDistricts(set);render();$("stamp").textContent="Atualizado: "+new Date().toLocaleString("pt-PT")
- }catch(e){console.error(e);$("notice").style.display="block";$("notice").innerHTML="<b>Erro ao carregar:</b> "+esc(e.message)+"<br>Confirme os nomes dos ficheiros e publique através do GitHub Pages.";$("stamp").textContent="Erro"}
- finally{forceReload=false;$("reload").disabled=false}
+   let salesRows=[];
+   try{base=await loadClients()}catch(e){console.error(e);base=[];errors.push("clientes.xlsx: "+e.message)}
+   try{salesRows=await loadRows(FILES.vendas,force)}catch(e){console.error(e);salesRows=[];errors.push("vendas.xlsx: "+e.message)}
+
+   let manifest={files:[]};
+   try{
+     const manifestUrl=force?FILES.manifest+"?v="+Date.now():FILES.manifest;
+     const manifestRes=await fetch(manifestUrl,{cache:force?"no-store":"default"});
+     if(!manifestRes.ok)throw new Error("HTTP "+manifestRes.status);
+     manifest=await manifestRes.json();
+   }catch(e){console.error(e);errors.push("manifest.json: "+e.message)}
+
+   importedSets=[];
+   for(let i=0;i<(manifest.files||[]).length;i++){
+     const f=manifest.files[i],label=f.label||f.name||("Ficheiro "+(i+1));
+     $("stamp").textContent="A abrir "+label+"…";
+     try{
+       const rows=await loadRows(f.path,force);
+       importedSets.push({id:"imp"+i,label,file:f.name,rows:parseImported(rows,"imp"+i,label)});
+     }catch(e){console.error("Erro em",f.path,e);errors.push(label+": "+e.message)}
+   }
+
+   reconcile(parseSales(salesRows));prepareIndexes();renderLimit=400;renderTabs();
+   const set=currentSet()||{id:"base",label:"Listagem de clientes",rows:base};
+   if(!currentSet())current="base";
+   configureFilters(set);fillDistricts(set);render();
+
+   if(errors.length){
+     $("notice").style.display="block";
+     $("notice").innerHTML="<b>Alguns ficheiros não abriram:</b><br>"+errors.map(esc).join("<br>");
+     $("stamp").textContent="Carregamento parcial";
+   }else{$("stamp").textContent="Atualizado: "+new Date().toLocaleString("pt-PT")}
+ }catch(e){
+   console.error(e);$("notice").style.display="block";$("notice").innerHTML="<b>Erro inesperado:</b> "+esc(e.message);$("stamp").textContent="Erro";
+ }finally{forceReload=false;$("reload").disabled=false}
 }
 if(typeof LOGO_DM!=="undefined")$("dmLogo").src=LOGO_DM;["activity","state"].forEach(id=>$(id).addEventListener("change",render));$("search").addEventListener("input",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{renderLimit=400;render()},180)});$("district").addEventListener("change",e=>{selectedDistrict=e.target.value;render()});$("exportExcel").onclick=exportExcel;$("exportPdf").onclick=exportPdf;$("reload").onclick=()=>loadAll(true);loadAll(false);
 </script>
