@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard de Clientes</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+<script src="dm-logo.js"></script>
 <style>
 :root{
  --bg:#f3f6fb;--card:#fff;--ink:#172033;--muted:#697386;--accent:#2359d1;
@@ -12,7 +15,7 @@
  --warn:#9a5b00;--warnbg:#fff1d6;--info:#175cd3;--infobg:#eaf2ff;--line:#e2e7ef
 }
 *{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink)}
-header{background:#12213f;color:#fff;padding:15px 24px;position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between}
+header{background:#12213f;color:#fff;padding:12px 24px;position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{display:flex;align-items:center;gap:13px}.brand img{width:72px;height:44px;object-fit:contain;background:#fff;border-radius:8px;padding:4px}
 header h1{font-size:20px;margin:0}header small{opacity:.78}.wrap{max-width:1720px;margin:auto;padding:20px}
 .tabs{display:flex;gap:8px;overflow:auto;margin-bottom:14px;padding-bottom:3px}
 .tab{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;white-space:nowrap;font-weight:650;color:#44506a}
@@ -20,7 +23,7 @@ header h1{font-size:20px;margin:0}header small{opacity:.78}.wrap{max-width:1720p
 .notice{display:none;background:#fff1d6;border:1px solid #efcf8a;color:#72430a;padding:12px;border-radius:10px;margin-bottom:12px}
 .toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}
 .toolbar input,.toolbar select,.toolbar button{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 12px;font-size:13px}
-.toolbar input{min-width:280px;flex:1}.toolbar button{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;cursor:pointer}
+.toolbar input{min-width:280px;flex:1}.toolbar button{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;cursor:pointer}.toolbar button.secondary{background:#fff;color:var(--accent)}.toolbar button:disabled{opacity:.55;cursor:wait}
 .cards{display:grid;grid-template-columns:repeat(6,minmax(140px,1fr));gap:11px;margin-bottom:14px}
 .card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:14px}.card span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.card b{display:block;font-size:24px;margin-top:5px}
 .content{display:grid;grid-template-columns:390px 1fr;gap:14px}
@@ -31,7 +34,7 @@ header h1{font-size:20px;margin:0}header small{opacity:.78}.wrap{max-width:1720p
 .maplabel{position:absolute;font-size:9px;color:#39465f;transform:translate(18px,-5px);white-space:nowrap}
 .legend{position:absolute;left:10px;bottom:10px;background:#ffffffdc;padding:8px;border-radius:9px;font-size:10px}
 .tablewrap{max-height:570px;overflow:auto}table{border-collapse:collapse;width:100%;font-size:12px}th{position:sticky;top:0;background:#f7f9fc;z-index:2;text-align:left;font-size:10px;text-transform:uppercase;color:#59657a}th,td{padding:10px 11px;border-bottom:1px solid var(--line)}tr.data:hover{background:#f1f6ff;cursor:pointer}
-.status{display:inline-block;padding:4px 8px;border-radius:20px;font-size:10px;font-weight:800;white-space:nowrap}.inactive{background:var(--dangerbg);color:var(--danger)}.sales,.existing{background:var(--infobg);color:var(--info)}.nosales{background:#eef0f4;color:#606877}.new{background:var(--okbg);color:var(--ok)}.possible{background:var(--warnbg);color:var(--warn)}
+.status{display:inline-block;padding:4px 8px;margin:1px 3px 1px 0;border-radius:20px;font-size:10px;font-weight:800;white-space:nowrap}.inactive{background:var(--dangerbg);color:var(--danger)}.sales,.existing{background:var(--infobg);color:var(--info)}.nosales{background:#eef0f4;color:#606877}.new{background:var(--okbg);color:var(--ok)}.possible{background:var(--warnbg);color:var(--warn)}
 .side{position:fixed;right:-500px;top:0;width:470px;max-width:95vw;height:100vh;background:#fff;z-index:60;box-shadow:-10px 0 30px #17203333;transition:.25s;padding:24px;overflow:auto}.side.open{right:0}.close{float:right;border:0;background:#eef1f6;border-radius:50%;width:36px;height:36px;font-size:20px;cursor:pointer}.overlay{display:none;position:fixed;inset:0;background:#10182866;z-index:50}.overlay.open{display:block}.field{padding:11px 0;border-bottom:1px solid var(--line)}.field label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
 .empty{padding:35px;text-align:center;color:var(--muted)}.filemeta{font-size:11px;color:var(--muted);margin-left:8px}
 @media(max-width:1150px){.cards{grid-template-columns:repeat(3,1fr)}.content{grid-template-columns:1fr}}
@@ -39,7 +42,7 @@ header h1{font-size:20px;margin:0}header small{opacity:.78}.wrap{max-width:1720p
 </style>
 </head>
 <body>
-<header><div><h1>Dashboard de Clientes</h1><small>Base, vendas e comparações independentes</small></div><small id="stamp">A carregar…</small></header>
+<header><div class="brand"><img id="dmLogo" alt="DM"><div><h1>Dashboard de Clientes</h1><small>Base, vendas e comparações independentes</small></div></div><small id="stamp">A carregar…</small></header>
 <main class="wrap">
 <div id="notice" class="notice"></div>
 <div id="tabs" class="tabs"></div>
@@ -52,6 +55,8 @@ header h1{font-size:20px;margin:0}header small{opacity:.78}.wrap{max-width:1720p
    <option value="inactive">Inativos apenas</option>
  </select>
  <select id="state"><option value="">Todos os estados</option></select>
+ <button id="exportExcel" class="secondary">Exportar Excel</button>
+ <button id="exportPdf" class="secondary">Exportar PDF</button>
  <button id="reload">Atualizar dados</button>
 </div>
 <div id="cards" class="cards"></div>
@@ -64,21 +69,21 @@ header h1{font-size:20px;margin:0}header small{opacity:.78}.wrap{max-width:1720p
 <script>
 const FILES={clientes:"dados/clientes.xlsx",vendas:"dados/vendas.xlsx",manifest:"dados/importados/manifest.json"};
 const positions={"VIANA DO CASTELO":[18,5],"BRAGA":[37,8],"VILA REAL":[60,12],"BRAGANCA":[80,9],"PORTO":[34,20],"AVEIRO":[31,33],"VISEU":[52,31],"GUARDA":[72,30],"COIMBRA":[40,43],"CASTELO BRANCO":[66,46],"LEIRIA":[33,54],"SANTAREM":[49,58],"LISBOA":[29,68],"PORTALEGRE":[69,62],"SETUBAL":[39,76],"EVORA":[62,75],"BEJA":[57,87],"FARO":[54,97],"ACORES":[8,88],"MADEIRA":[15,97],"SEM DISTRITO":[88,94]};
-let base=[], importedSets=[], current="base", selectedDistrict="";
+let base=[], importedSets=[], current="base", selectedDistrict="", forceReload=false, searchTimer=null;
 const $=id=>document.getElementById(id),fmt=n=>new Intl.NumberFormat("pt-PT").format(n||0),clean=v=>String(v??"").trim();
 const esc=v=>clean(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 const norm=v=>clean(v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]/g,"");
 const nif=v=>clean(v).replace(/\D/g,"").replace(/^0+(?=\d{9}$)/,"");
 function district(v){let x=clean(v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();return {"BRAGANÇA":"BRAGANCA","SANTARÉM":"SANTAREM","ÉVORA":"EVORA","AÇORES":"ACORES","FUNCHAL":"MADEIRA"}[x]||x||"SEM DISTRITO"}
 function value(row,names){const keys=Object.keys(row);for(const n of names){const k=keys.find(k=>norm(k)===norm(n));if(k!==undefined&&clean(row[k])!=="")return row[k]}return""}
-async function loadBuffer(url){const r=await fetch(url+(url.includes("?")?"&":"?")+"v="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("Falha ao ler "+url);return r.arrayBuffer()}
-async function loadRows(url){
- const buf=await loadBuffer(url),wb=XLSX.read(buf,{type:"array"});
+async function loadBuffer(url,force=false){const target=force?url+(url.includes("?")?"&":"?")+"v="+Date.now():url;const r=await fetch(target,{cache:force?"no-store":"default"});if(!r.ok)throw new Error("Falha ao ler "+url);return r.arrayBuffer()}
+async function loadRows(url,force=false){
+ const buf=await loadBuffer(url,force),wb=XLSX.read(buf,{type:"array"});
  const ws=wb.Sheets[wb.SheetNames[0]];
  return XLSX.utils.sheet_to_json(ws,{defval:"",raw:false});
 }
 async function loadClients(){
- const buf=await loadBuffer(FILES.clientes),wb=XLSX.read(buf,{type:"array"}),ws=wb.Sheets[wb.SheetNames[0]],m=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:false});
+ const buf=await loadBuffer(FILES.clientes,forceReload),wb=XLSX.read(buf,{type:"array"}),ws=wb.Sheets[wb.SheetNames[0]],m=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:false});
  const hi=m.findIndex(r=>r.some(v=>norm(v)==="CLIENTE")&&r.some(v=>norm(v)==="CONTRIB"));if(hi<0)throw new Error("Cabeçalho de clientes não encontrado");
  const h=m[hi].map(clean);return m.slice(hi+1).map((r,i)=>{const o={};h.forEach((x,j)=>{if(x)o[x]=r[j]??""});return{
   uid:"b"+i,code:clean(value(o,["Cliente"])),name:clean(value(o,["Nome"])),nif:nif(value(o,["Contrib.","Contribuinte","NIF"])),
@@ -112,7 +117,8 @@ function reconcile(sales){
  importedSets.forEach(set=>set.rows.forEach(r=>{let m=null,s="";if(r.nif&&byNif.has(r.nif)){m=byNif.get(r.nif);s="existing"}else if(r.email&&byEmail.has(norm(r.email))){m=byEmail.get(norm(r.email));s="existing"}else if(r.name&&byName.has(norm(r.name))){m=byName.get(norm(r.name));s="existing"}else{const rn=norm(r.legalName||r.name);if(rn.length>7){m=base.find(c=>{const cn=norm(c.name);return cn.length>7&&(cn.includes(rn)||rn.includes(cn))})||null;if(m)s="possible"}}r.match=m;r.matchState=s||"new";r.hasSales=!!(m&&m.hasSales);r.inactive=!!(m&&m.inactive)}))
 }
 function currentSet(){return current==="base"?{id:"base",label:"Listagem de clientes",rows:base}:importedSets.find(x=>x.id===current)}
-function statusHtml(r){if(!r.isImported){if(r.inactive)return'<span class="status inactive">Inativo</span>';return r.hasSales?'<span class="status sales">Com vendas</span>':'<span class="status nosales">Sem vendas</span>'}return r.matchState==="new"?'<span class="status new">Cliente novo</span>':r.matchState==="possible"?'<span class="status possible">Possível correspondência</span>':'<span class="status existing">Já é cliente</span>'}
+function statusHtml(r){if(!r.isImported){if(r.inactive)return'<span class="status inactive">Inativo</span>';return r.hasSales?'<span class="status sales">Com vendas</span>':'<span class="status nosales">Sem vendas</span>'}if(r.matchState==="new")return'<span class="status new">Cliente novo</span>';if(r.matchState==="possible")return'<span class="status possible">Possível correspondência</span>';return'<span class="status existing">Já é cliente</span>'+(r.inactive?'<span class="status inactive">Inativo</span>':r.hasSales?'<span class="status sales">Com vendas</span>':'<span class="status nosales">Sem vendas</span>')}
+function statusText(r){if(!r.isImported)return r.inactive?"Inativo":r.hasSales?"Com vendas":"Sem vendas";if(r.matchState==="new")return"Cliente novo";if(r.matchState==="possible")return"Possível correspondência";return"Já é cliente - "+(r.inactive?"Inativo":r.hasSales?"Com vendas":"Sem vendas")} 
 function configureFilters(set){
  $("activity").style.display=set.id==="base"?"":"none";
  $("state").innerHTML=set.id==="base"?'<option value="">Todos os estados</option><option value="sales">Com vendas</option><option value="nosales">Sem vendas</option><option value="inactive">Inativos</option>':'<option value="">Todos os estados</option><option value="existing">Já é cliente</option><option value="new">Cliente novo</option><option value="possible">Possível correspondência</option>';
@@ -125,7 +131,7 @@ function filtered(){
 function renderCards(set){
  let cards=[];
  if(set.id==="base"){const a=base.filter(x=>!x.inactive),ina=base.filter(x=>x.inactive);cards=[["Clientes ativos",a.length],["Clientes inativos",ina.length],["Ativos com vendas",a.filter(x=>x.hasSales).length],["Ativos sem vendas",a.filter(x=>!x.hasSales).length],["Distritos",new Set(a.map(x=>x.district)).size],["Total da base",base.length]]}
- else{const r=set.rows;cards=[["Total da lista",r.length],["Já são clientes",r.filter(x=>x.matchState==="existing").length],["Clientes novos",r.filter(x=>x.matchState==="new").length],["Possíveis correspondências",r.filter(x=>x.matchState==="possible").length],["Com vendas na base",r.filter(x=>x.match&&x.match.hasSales).length],["Distritos da lista",new Set(r.map(x=>x.district)).size]]}
+ else{const r=set.rows;cards=[["Total da lista",r.length],["Clientes com vendas",r.filter(x=>x.matchState==="existing"&&x.hasSales&&!x.inactive).length],["Clientes sem vendas",r.filter(x=>x.matchState==="existing"&&!x.hasSales&&!x.inactive).length],["Clientes novos",r.filter(x=>x.matchState==="new").length],["Possíveis correspondências",r.filter(x=>x.matchState==="possible").length],["Clientes inativos",r.filter(x=>x.matchState==="existing"&&x.inactive).length]]}
  $("cards").innerHTML=cards.map(x=>`<div class="card"><span>${esc(x[0])}</span><b>${fmt(x[1])}</b></div>`).join("")
 }
 function renderMap(rows,set){
@@ -152,17 +158,28 @@ function showDetail(uid){
  $("detail").innerHTML=`<h2>${esc(r.name||"Sem nome")}</h2><p>${statusHtml(r)}</p>`+fields.filter(x=>clean(x[1])!=="").map(x=>`<div class="field"><label>${esc(x[0])}</label><div>${esc(x[1])}</div></div>`).join("");$("side").classList.add("open");$("overlay").classList.add("open")
 }
 function closeSide(){$("side").classList.remove("open");$("overlay").classList.remove("open")}
-async function loadAll(){
- $("stamp").textContent="A carregar ficheiros…";$("notice").style.display="none";
+function exportRows(){return filtered().map(r=>({
+ "Cliente":r.name||"", "Nome legal":r.legalName||"", "Nome comercial":r.commercialName||"", "Código":r.code||"", "NIF":r.nif||"",
+ "Email":r.email||"", "Telefone":r.phone||r.mobile||"", "Morada":r.address||"", "Código postal":r.postalCode||"", "Localidade":r.locality||"",
+ "Distrito":r.district||"", "Vendedor":r.seller||"", "Estado":statusText(r), "Correspondência na base":r.match?`${r.match.name} (${r.match.code||r.match.nif||""})`:"", "Origem":r.source||""
+}))}
+function safeFileName(v){return clean(v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"_").replace(/^_+|_+$/g,"")||"clientes"}
+function exportExcel(){const rows=exportRows();if(!rows.length)return alert("Não existem registos para exportar.");const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();ws["!cols"]=[{wch:30},{wch:28},{wch:28},{wch:12},{wch:14},{wch:28},{wch:16},{wch:35},{wch:14},{wch:22},{wch:18},{wch:20},{wch:28},{wch:38},{wch:24}];XLSX.utils.book_append_sheet(wb,ws,"Clientes");XLSX.writeFile(wb,safeFileName(currentSet().label)+"_"+new Date().toISOString().slice(0,10)+".xlsx")}
+function exportPdf(){const rows=filtered();if(!rows.length)return alert("Não existem registos para exportar.");if(!window.jspdf||!window.jspdf.jsPDF)return alert("A biblioteca de PDF não foi carregada. Verifique a ligação à Internet.");const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});try{if(typeof LOGO_DM!=="undefined")doc.addImage(LOGO_DM,"JPEG",14,8,28,17)}catch(e){}doc.setFontSize(15);doc.text(currentSet().label,48,16);doc.setFontSize(9);doc.text("Exportado em "+new Date().toLocaleString("pt-PT")+" — "+rows.length+" registo(s)",48,22);doc.autoTable({startY:29,head:[["Cliente","Código","NIF","Distrito","Estado"]],body:rows.map(r=>[r.name||"",r.code||"",r.nif||"",r.district||"",statusText(r)]),styles:{fontSize:7,cellPadding:1.8,overflow:"linebreak"},headStyles:{fontStyle:"bold"},columnStyles:{0:{cellWidth:70},1:{cellWidth:24},2:{cellWidth:28},3:{cellWidth:35},4:{cellWidth:65}},didDrawPage:data=>{doc.setFontSize(7);doc.text("Página "+doc.internal.getNumberOfPages(),270,202)}});doc.save(safeFileName(currentSet().label)+"_"+new Date().toISOString().slice(0,10)+".pdf")}
+
+async function loadAll(force=false){
+ forceReload=force;$("reload").disabled=true;$("stamp").textContent="A carregar ficheiros…";$("notice").style.display="none";
  try{
-   const [clients,salesRows,manifestRes]=await Promise.all([loadClients(),loadRows(FILES.vendas),fetch(FILES.manifest+"?v="+Date.now(),{cache:"no-store"})]);
+   const manifestUrl=force?FILES.manifest+"?v="+Date.now():FILES.manifest;
+   const [clients,salesRows,manifestRes]=await Promise.all([loadClients(),loadRows(FILES.vendas,force),fetch(manifestUrl,{cache:force?"no-store":"default"})]);
    if(!manifestRes.ok)throw new Error("Não foi possível ler o manifesto dos importados");
-   const manifest=await manifestRes.json();base=clients;importedSets=[];
-   for(let i=0;i<(manifest.files||[]).length;i++){const f=manifest.files[i],rows=await loadRows(f.path);importedSets.push({id:"imp"+i,label:f.label||f.name,file:f.name,rows:parseImported(rows,"imp"+i,f.label||f.name)})}
+   const manifest=await manifestRes.json();base=clients;
+   importedSets=await Promise.all((manifest.files||[]).map(async(f,i)=>{const rows=await loadRows(f.path,force);return{id:"imp"+i,label:f.label||f.name,file:f.name,rows:parseImported(rows,"imp"+i,f.label||f.name)}}));
    reconcile(parseSales(salesRows));renderTabs();const set=currentSet();configureFilters(set);fillDistricts(set);render();$("stamp").textContent="Atualizado: "+new Date().toLocaleString("pt-PT")
  }catch(e){console.error(e);$("notice").style.display="block";$("notice").innerHTML="<b>Erro ao carregar:</b> "+esc(e.message)+"<br>Confirme os nomes dos ficheiros e publique através do GitHub Pages.";$("stamp").textContent="Erro"}
+ finally{forceReload=false;$("reload").disabled=false}
 }
-["search","activity","state"].forEach(id=>$(id).addEventListener(id==="search"?"input":"change",render));$("district").addEventListener("change",e=>{selectedDistrict=e.target.value;render()});$("reload").onclick=loadAll;loadAll();
+if(typeof LOGO_DM!=="undefined")$("dmLogo").src=LOGO_DM;["activity","state"].forEach(id=>$(id).addEventListener("change",render));$("search").addEventListener("input",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(render,160)});$("district").addEventListener("change",e=>{selectedDistrict=e.target.value;render()});$("exportExcel").onclick=exportExcel;$("exportPdf").onclick=exportPdf;$("reload").onclick=()=>loadAll(true);loadAll(false);
 </script>
 </body>
 </html>
