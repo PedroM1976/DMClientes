@@ -77,10 +77,24 @@ const nif=v=>clean(v).replace(/\D/g,"").replace(/^0+(?=\d{9}$)/,"");
 function district(v){let x=clean(v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();return {"BRAGANÇA":"BRAGANCA","SANTARÉM":"SANTAREM","ÉVORA":"EVORA","AÇORES":"ACORES","FUNCHAL":"MADEIRA"}[x]||x||"SEM DISTRITO"}
 function value(row,names){const keys=Object.keys(row);for(const n of names){const k=keys.find(k=>norm(k)===norm(n));if(k!==undefined&&clean(row[k])!=="")return row[k]}return""}
 async function loadBuffer(url,force=false){const target=force?url+(url.includes("?")?"&":"?")+"v="+Date.now():url;const r=await fetch(target,{cache:force?"no-store":"default"});if(!r.ok)throw new Error("Falha ao ler "+url);return r.arrayBuffer()}
+function chooseImportedSheet(wb){
+ const preferredHeaders=["NIF","ENTIDADE","NOME DA FIRMA","COMPANY","NOMBRE COMERCIAL (Nome Comercial)","VAT Number"];
+ let best=null,bestScore=-1;
+ for(const sheetName of wb.SheetNames){
+  const ws=wb.Sheets[sheetName];
+  const preview=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:false,range:0,blankrows:false}).slice(0,15);
+  for(let rowIndex=0;rowIndex<preview.length;rowIndex++){
+   const headers=(preview[rowIndex]||[]).map(v=>norm(v));
+   const score=preferredHeaders.reduce((n,h)=>n+(headers.includes(norm(h))?1:0),0);
+   if(score>bestScore){bestScore=score;best={ws,sheetName,rowIndex}}
+  }
+ }
+ return best&&bestScore>0?best:{ws:wb.Sheets[wb.SheetNames[0]],sheetName:wb.SheetNames[0],rowIndex:0};
+}
 async function loadRows(url,force=false){
  const buf=await loadBuffer(url,force),wb=XLSX.read(buf,{type:"array"});
- const ws=wb.Sheets[wb.SheetNames[0]];
- return XLSX.utils.sheet_to_json(ws,{defval:"",raw:false});
+ const selected=chooseImportedSheet(wb);
+ return XLSX.utils.sheet_to_json(selected.ws,{defval:"",raw:false,range:selected.rowIndex,blankrows:false});
 }
 async function loadClients(){
  const buf=await loadBuffer(FILES.clientes,forceReload),wb=XLSX.read(buf,{type:"array"}),ws=wb.Sheets[wb.SheetNames[0]],m=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:false});
@@ -96,17 +110,17 @@ function parseSales(rows){const codes=new Set,nifs=new Set;rows.forEach(r=>{cons
 function parseImported(rows,setId,label){
  return rows.map((r,i)=>({
   uid:setId+"_"+i,
-  name:clean(value(r,["COMPANY POS","COMPANY","NOMBRE COMERCIAL (Nome Comercial)","NOME DA FIRMA","Nome","Cliente"])),
-  legalName:clean(value(r,["COMPANY","NOME DA FIRMA"])),
-  commercialName:clean(value(r,["NOMBRE COMERCIAL (Nome Comercial)","NOME DA FIRMA"])),
+  name:clean(value(r,["ENTIDADE","COMPANY POS","COMPANY","NOMBRE COMERCIAL (Nome Comercial)","NOME DA FIRMA","Nome","Cliente"])),
+  legalName:clean(value(r,["ENTIDADE","COMPANY","NOME DA FIRMA"])),
+  commercialName:clean(value(r,["ENTIDADE","NOMBRE COMERCIAL (Nome Comercial)","NOME DA FIRMA"])),
   code:clean(value(r,["B2B CODE","Código","Cliente","COOP.","Cliente Sage"])),
   nif:nif(value(r,["VAT Number","Contribuinte","NIF","NºCONT.","Nº CONT.","N CONT"])),
   email:clean(value(r,["CORREO GENERAL (E-mail Geral)","Email","E-Mail","E-MAIL"])),
-  phone:clean(value(r,["Telefone","Phone","TELEFONE"])),
+  phone:clean(value(r,["TELEFONE1","TELEFONE2","Telefone","Phone","TELEFONE"])),
   address:clean(value(r,["Morada","MORADA"])),
   locality:clean(value(r,["LOCALIDAD (Localidade)","Localidade","LOCALIDADE"])),
-  postalCode:clean(value(r,["CP (Codigo Postal)","Código Postal","CP"])),
-  district:district(value(r,["PROVINCIA (Distrito)","Distrito"])),
+  postalCode:clean(value(r,["CODIGO_POS","CP (Codigo Postal)","Código Postal","CP"])),
+  district:district(value(r,["DISTRITO","PROVINCIA (Distrito)","Distrito"])),
   seller:clean(value(r,["REPRESENTANTE","Vendedor"])),
   source:label,isImported:true,setId
  })).filter(x=>x.name||x.nif||x.email||x.code)
