@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard de Clientes</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+window.DM_SUPABASE_CONFIG=Object.freeze({
+ url:'https://lyihzeddgfbzmuqwrjya.supabase.co',
+ key:'sb_publishable_sBVSviRAaAi_l92aszt9xg_Q76yHSZC'
+});
+</script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="dm-logo.js"></script>
@@ -216,6 +223,78 @@ function safeFileName(v){return clean(v).normalize("NFD").replace(/[\u0300-\u036
 function exportExcel(){const rows=exportRows();if(!rows.length)return alert("Não existem registos para exportar.");const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();ws["!cols"]=[{wch:30},{wch:28},{wch:28},{wch:12},{wch:14},{wch:28},{wch:16},{wch:35},{wch:14},{wch:22},{wch:18},{wch:20},{wch:28},{wch:38},{wch:24}];XLSX.utils.book_append_sheet(wb,ws,"Clientes");XLSX.writeFile(wb,safeFileName(currentSet().label)+"_"+new Date().toISOString().slice(0,10)+".xlsx")}
 function exportPdf(){const rows=filtered();if(!rows.length)return alert("Não existem registos para exportar.");if(!window.jspdf||!window.jspdf.jsPDF)return alert("A biblioteca de PDF não foi carregada. Verifique a ligação à Internet.");const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});try{if(typeof LOGO_DM!=="undefined")doc.addImage(LOGO_DM,"JPEG",14,8,28,17)}catch(e){}doc.setFontSize(15);doc.text(currentSet().label,48,16);doc.setFontSize(9);doc.text("Exportado em "+new Date().toLocaleString("pt-PT")+" — "+rows.length+" registo(s)",48,22);doc.autoTable({startY:29,head:[["Cliente","Código","NIF","Distrito","Estado"]],body:rows.map(r=>[r.name||"",r.code||"",r.nif||"",r.district||"",statusText(r)]),styles:{fontSize:7,cellPadding:1.8,overflow:"linebreak"},headStyles:{fontStyle:"bold"},columnStyles:{0:{cellWidth:70},1:{cellWidth:24},2:{cellWidth:28},3:{cellWidth:35},4:{cellWidth:65}},didDrawPage:data=>{doc.setFontSize(7);doc.text("Página "+doc.internal.getNumberOfPages(),270,202)}});doc.save(safeFileName(currentSet().label)+"_"+new Date().toISOString().slice(0,10)+".pdf")}
 
+
+function crmOwnerId(value){
+ const n=clean(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ if(n.includes("rui")&&n.includes("ferreira"))return "rui_ferreira";
+ if(n.includes("joao")&&n.includes("rebelo"))return "joao_rebelo";
+ if(n.includes("sandro")&&n.includes("loureiro"))return "sandro_loureiro";
+ if(n.includes("assistencia"))return "assistencia";
+ if(n.includes("administrador"))return "administrador";
+ return "";
+}
+function crmClientKey(c){
+ const n=nif(c.nif),code=norm(c.code),name=norm(c.name||c.legalName||c.commercialName);
+ return n?"NIF:"+n:code?"CODE:"+code:name?"NAME:"+name:"";
+}
+function crmClientRows(){
+ const all=[...base,...importedSets.flatMap(set=>set.rows)];
+ const unique=new Map();
+ all.forEach(c=>{
+  const name=clean(c.name||c.legalName||c.commercialName),key=crmClientKey(c);
+  if(!name||!key)return;
+  const previous=unique.get(key)||{};
+  const ownerName=clean(c.seller||previous.owner_name||"");
+  unique.set(key,{
+   source_key:clean(c.source||"PORTAL_CLIENTES").slice(0,120),
+   name,
+   nif:nif(c.nif),
+   phone:clean(c.phone||c.mobile||previous.phone||""),
+   email:clean(c.email||previous.email||""),
+   district:clean(c.district||previous.district||""),
+   owner_id:crmOwnerId(ownerName)||previous.owner_id||"",
+   owner_name:ownerName,
+   active:!c.inactive,
+   updated_by:"portal_clientes"
+  });
+ });
+ return [...unique.values()];
+}
+async function syncClientsToCrm(){
+ const cfg=window.DM_SUPABASE_CONFIG||{};
+ if(!window.supabase||!cfg.url||!cfg.key)return {ok:false,message:"Supabase não configurado"};
+ const rows=crmClientRows();
+ if(!rows.length)return {ok:true,inserted:0,updated:0,total:0};
+ const client=window.supabase.createClient(cfg.url,cfg.key);
+ const existingResult=await client.from("crm_clients").select("id,name,nif,source_key,phone,email,district,owner_id,owner_name,active");
+ if(existingResult.error)throw existingResult.error;
+ const existing=existingResult.data||[],byNif=new Map(),byName=new Map();
+ existing.forEach(c=>{
+  const n=nif(c.nif);if(n&&!byNif.has(n))byNif.set(n,c);
+  const nm=norm(c.name);if(nm&&!byName.has(nm))byName.set(nm,c);
+ });
+ const inserts=[],updates=[];
+ rows.forEach(row=>{
+  const found=(row.nif&&byNif.get(row.nif))||byName.get(norm(row.name));
+  if(!found)inserts.push({...row,created_by:"portal_clientes"});
+  else updates.push({id:found.id,...row});
+ });
+ for(let i=0;i<inserts.length;i+=200){
+  const r=await client.from("crm_clients").insert(inserts.slice(i,i+200));
+  if(r.error)throw r.error;
+ }
+ for(let i=0;i<updates.length;i+=100){
+  const batch=updates.slice(i,i+100);
+  for(const row of batch){
+   const {id,...payload}=row;
+   const r=await client.from("crm_clients").update(payload).eq("id",id);
+   if(r.error)throw r.error;
+  }
+ }
+ try{localStorage.setItem("dmPortalClientsSyncedAt",new Date().toISOString())}catch(_){ }
+ return {ok:true,inserted:inserts.length,updated:updates.length,total:rows.length};
+}
+
 async function loadAll(force=false){
  forceReload=force;$("reload").disabled=true;$("stamp").textContent="A carregar ficheiros…";$("notice").style.display="none";
  const errors=[];
@@ -247,11 +326,22 @@ async function loadAll(force=false){
    if(!currentSet())current="base";
    configureFilters(set);fillDistricts(set);render();
 
+   let syncInfo=null;
+   try{
+     $("stamp").textContent="A sincronizar clientes com o CRM…";
+     syncInfo=await syncClientsToCrm();
+   }catch(syncError){
+     console.error("Erro ao sincronizar clientes com o CRM",syncError);
+     errors.push("CRM/Supabase: "+(syncError.message||syncError));
+   }
    if(errors.length){
      $("notice").style.display="block";
-     $("notice").innerHTML="<b>Alguns ficheiros não abriram:</b><br>"+errors.map(esc).join("<br>");
+     $("notice").innerHTML="<b>Alguns ficheiros ou sincronizações falharam:</b><br>"+errors.map(esc).join("<br>");
      $("stamp").textContent="Carregamento parcial";
-   }else{$("stamp").textContent="Atualizado: "+new Date().toLocaleString("pt-PT")}
+   }else{
+     const syncText=syncInfo&&syncInfo.ok?` · CRM: ${syncInfo.total} clientes (${syncInfo.inserted} novos, ${syncInfo.updated} atualizados)`:"";
+     $("stamp").textContent="Atualizado: "+new Date().toLocaleString("pt-PT")+syncText;
+   }
  }catch(e){
    console.error(e);$("notice").style.display="block";$("notice").innerHTML="<b>Erro inesperado:</b> "+esc(e.message);$("stamp").textContent="Erro";
  }finally{forceReload=false;$("reload").disabled=false}
