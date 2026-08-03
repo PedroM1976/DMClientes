@@ -119,13 +119,14 @@ function saleCodeKeys(v){
  return keys
 }
 function parseSales(rows){
- const codes=new Set,nifs=new Set;
+ const codes=new Set,nifs=new Set,names=new Set;
  rows.forEach(r=>{
   const c=value(r,["CLIENTES","Cliente","Código Cliente","COD CLIENTE","COD. CLIENTE","CLIENTE RDS","RDS"]);
   saleCodeKeys(c).forEach(k=>codes.add(k));
+  const normalizedName=norm(c);if(normalizedName)names.add(normalizedName);
   const n=nif(value(r,["CONTRIBUINTE","NIF","VAT Number","Nº CONTRIBUINTE"]));if(n)nifs.add(n)
  });
- return{codes,nifs}
+ return{codes,nifs,names}
 }
 function parseImported(rows,setId,label){
  return rows.map((r,i)=>({
@@ -147,7 +148,7 @@ function parseImported(rows,setId,label){
 }
 function reconcile(sales){
  const byNif=new Map,byEmail=new Map,byName=new Map;
- base.forEach(c=>{c.inactive=c.group==="INA";const codeMatch=[...saleCodeKeys(c.code)].some(k=>sales.codes.has(k));c.hasSales=(c.nif&&sales.nifs.has(c.nif))||codeMatch;c.matchState=c.inactive?"inactive":c.hasSales?"sales":"nosales";if(c.nif&&!byNif.has(c.nif))byNif.set(c.nif,c);if(c.email&&!byEmail.has(norm(c.email)))byEmail.set(norm(c.email),c);if(c.name&&!byName.has(norm(c.name)))byName.set(norm(c.name),c)});
+ base.forEach(c=>{c.inactive=c.group==="INA";const codeMatch=[...saleCodeKeys(c.code)].some(k=>sales.codes.has(k));const nameMatch=!!(c.name&&sales.names&&sales.names.has(norm(c.name)));c.hasSales=(c.nif&&sales.nifs.has(c.nif))||codeMatch||nameMatch;c.matchState=c.inactive?"inactive":c.hasSales?"sales":"nosales";if(c.nif&&!byNif.has(c.nif))byNif.set(c.nif,c);if(c.email&&!byEmail.has(norm(c.email)))byEmail.set(norm(c.email),c);if(c.name&&!byName.has(norm(c.name)))byName.set(norm(c.name),c)});
  importedSets.forEach(set=>set.rows.forEach(r=>{let m=null,s="";if(r.nif&&byNif.has(r.nif)){m=byNif.get(r.nif);s="existing"}else if(r.email&&byEmail.has(norm(r.email))){m=byEmail.get(norm(r.email));s="existing"}else if(r.name&&byName.has(norm(r.name))){m=byName.get(norm(r.name));s="existing"}else{const rn=norm(r.legalName||r.name);if(rn.length>7){m=base.find(c=>{const cn=norm(c.name);return cn.length>7&&(cn.includes(rn)||rn.includes(cn))})||null;if(m)s="possible"}}r.match=m;r.matchState=s||"new";r.hasSales=!!(m&&m.hasSales);r.inactive=!!(m&&m.inactive)}))
 }
 function makeSearchIndex(r){
