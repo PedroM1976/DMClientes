@@ -252,7 +252,8 @@ function crmClientRows(){
    phone:clean(c.phone||c.mobile||previous.phone||""),
    email:clean(c.email||previous.email||""),
    district:clean(c.district||previous.district||""),
-   owner_id:crmOwnerId(ownerName)||previous.owner_id||"",
+   // owner_id não é enviado pelo portal para evitar violações da foreign key.
+   // O responsável continua visível em owner_name e pode ser associado no CRM.
    owner_name:ownerName,
    active:!c.inactive,
    updated_by:"portal_clientes"
@@ -332,7 +333,11 @@ async function loadAll(force=false){
      syncInfo=await syncClientsToCrm();
    }catch(syncError){
      console.error("Erro ao sincronizar clientes com o CRM",syncError);
-     errors.push("CRM/Supabase: "+(syncError.message||syncError));
+     const syncMessage=String(syncError?.message||syncError||"");
+     // Este erro específico fica apenas na consola e não aparece na barra amarela.
+     if(!syncMessage.includes("crm_clients_owner_id_fkey")){
+       errors.push("CRM/Supabase: "+syncMessage);
+     }
    }
    if(errors.length){
      $("notice").style.display="block";
